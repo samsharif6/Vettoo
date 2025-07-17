@@ -109,12 +109,12 @@ def run_app():
         )
         return
 
-    # Detailed view by Qualification
+        # Detailed view by Qualification
     df_plot = sub.set_index("Latest Qualification")[numeric_cols].T
     df_plot.index = [shorten_label(c) for c in df_plot.index]
     st.line_chart(df_plot)
 
-        # Prepare detailed table with totals row
+    # Prepare detailed table with totals row
     subtable = sub.copy()
     totals = subtable[numeric_cols].sum()
     totals_dict = {col: totals[col] for col in numeric_cols}
@@ -127,7 +127,7 @@ def run_app():
     rename_map = {c: shorten_label(c) for c in numeric_cols}
     table_display = table.rename(columns=rename_map)
 
-        st.subheader("Data Table")
+    st.subheader("Data Table")
     st.dataframe(table_display)
 
     # Download detailed data
@@ -137,11 +137,6 @@ def run_app():
     towrite.seek(0)
     file_name = f"{status.lower().replace(' ', '_')}_NCVER_data.xlsx"
     st.download_button(
-        label="📥 Download data as Excel",
-        data=towrite,
-        file_name=file_name,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )(
         label="📥 Download data as Excel",
         data=towrite,
         file_name=file_name,
