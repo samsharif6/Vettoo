@@ -76,7 +76,6 @@ def run_app():
     # If only status selected: load SA sheet
     if not tps and not quals:
         sa_df = pd.read_excel(dl.file_path, sheet_name="SA")
-        # filter years
         if years_int:
             numeric_cols = [
                 c for c in sa_df.columns
@@ -96,10 +95,15 @@ def run_app():
             st.warning(f"No aggregated data for {status} in SA sheet.")
             return
         totals = row.squeeze()
-        # plot
+
+        # Plot single total line
         df_plot = pd.DataFrame(totals.values, index=[shorten_label(c) for c in numeric_cols], columns=[status])
-        st.line_chart(df_plot)
-        # table
+        fig = px.line(df_plot, markers=True)
+        # remove axis titles
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Show total table
         table_display = pd.DataFrame([{
             "Latest Qualification": f"Total {status}",
             **{shorten_label(c): totals[c] for c in numeric_cols}
@@ -132,12 +136,13 @@ def run_app():
         f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia"
     )
 
-        # Plot
+    # Plot
     if aggregate and tps:
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
-        # transpose for time on x-axis
         df_long = agg_df.melt(id_vars="Training Packages", value_vars=numeric_cols,
                               var_name="Period", value_name="Value")
+        # shorten Period labels
+        df_long["Period"] = df_long["Period"].apply(shorten_label)
         fig = px.line(
             df_long,
             x="Period",
@@ -146,15 +151,15 @@ def run_app():
             markers=True,
             title="Aggregated by Training Package"
         )
-        # move legend to right
         fig.update_layout(
             legend=dict(orientation="v", x=1.02, y=1),
-            margin=dict(r=200)
+            margin=dict(r=200), xaxis_title=None, yaxis_title=None
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
         df_long = sub.melt(id_vars="Latest Qualification", value_vars=numeric_cols,
                            var_name="Period", value_name="Value")
+        df_long["Period"] = df_long["Period"].apply(shorten_label)
         fig = px.line(
             df_long,
             x="Period",
@@ -165,7 +170,7 @@ def run_app():
         )
         fig.update_layout(
             legend=dict(orientation="v", x=1.02, y=1),
-            margin=dict(r=200)
+            margin=dict(r=200), xaxis_title=None, yaxis_title=None
         )
         st.plotly_chart(fig, use_container_width=True)
 
