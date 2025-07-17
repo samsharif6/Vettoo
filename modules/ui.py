@@ -52,8 +52,7 @@ def run_app():
         options=qual_options,
         default=[],
         key="quals"
-    )(
-        "Qualification(s)",
+    )",
         options=qual_options,
         default=[],
         key="quals"
