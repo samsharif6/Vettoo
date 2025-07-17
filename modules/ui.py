@@ -18,9 +18,8 @@ def shorten_label(c: str) -> str:
 def run_app():
     # Configure page
     st.set_page_config(page_title="Vettoo Dashboard", layout="wide")
-    st.title("Vettoo – Your data buddy in the VET world.")
+    st.title("🤖 Vettoo")
     st.subheader("Click less. Know more.")
-    st.subheader("Your data buddy in the VET world.")
 
     # Sidebar: status selector
     dl = DataLoader()
