@@ -102,11 +102,11 @@ def run_app():
         table.to_excel(writer, index=False, sheet_name="Data")
     towrite.seek(0)
 
-    file_name = f"{status.lower().replace(' ', '_')}_NCVER_data.xlsx"  # ← Add this
+    file_name = f"{status.lower().replace(' ', '_')}_NCVER_data.xlsx"
 
-st.download_button(
-    label="📥 Download data as Excel",
-    data=towrite,
-    file_name=file_name,  # ← Use it here
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+    st.download_button(
+        label="📥 Download data as Excel",
+        data=towrite,
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
