@@ -149,7 +149,7 @@ def run_app():
             "Training Packages": ", ".join(tps) if tps else "None",
             "Qualifications": ", ".join(quals) if quals else "None"
         }
-        md_df = pd.DataFrame(list(metadata.items()), columns=["Description","Value"])
+        md_df = pd.DataFrame(list(metadata.items(), columns=["Description","Value"])
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
     fname = f"{status.lower().replace(' ','_')}_data_{start}_to_{end}.xlsx"
