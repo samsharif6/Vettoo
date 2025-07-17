@@ -18,21 +18,31 @@ def shorten_label(c: str) -> str:
 def run_app():
     # Configure page
     st.set_page_config(page_title="Vettoo Dashboard", layout="wide")
-    st.title("🤖 Vettoo")
+    st.title("Vettoo – Your data buddy in the VET world.")
     st.subheader("Click less. Know more.")
+    st.subheader("Your data buddy in the VET world.")
+
+    # Reset button
+    if st.sidebar.button("Reset selections"):
+        for key in ["status", "tps", "aggregate", "quals"]:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.experimental_rerun()
 
     # Sidebar: status selector
     dl = DataLoader()
     status = st.sidebar.selectbox(
         "Training Contract Status",
-        ["Commencements", "In-training", "Completions"]
+        ["Commencements", "In-training", "Completions"],
+        key="status"
     )
     df = dl.load_status(status)
 
     # Sidebar: training package selector
     tps = st.sidebar.multiselect(
         "Training Package(s)",
-        options=sorted(df["Training Packages"].unique())
+        options=sorted(df["Training Packages"].unique()),
+        key="tps"
     )
 
     # Aggregate toggle (only if TP selected)
@@ -40,7 +50,8 @@ def run_app():
     if tps:
         aggregate = st.sidebar.checkbox(
             "Aggregate qualifications by Training Package",
-            value=False
+            value=False,
+            key="aggregate"
         )
 
     # Sidebar: qualification selector (detailed view only; empty by default)
@@ -49,7 +60,8 @@ def run_app():
         "Qualification(s)\n(only shows aligned to selected TP)",
         options=all_quals,
         default=[],
-        disabled=aggregate
+        disabled=aggregate,
+        key="quals"
     )
 
     # Show instructions until training package selected
@@ -59,6 +71,8 @@ def run_app():
             **Instructions**  
             1. Select a *Training Contract Status* from the sidebar.  
             2. Choose one or more *Training Packages*.
+            3. Optionally check **Aggregate qualifications by Training Package**.
+            4. If **Aggregate** is unchecked, select at least one *Qualification*.
             """
         )
         st.info(
