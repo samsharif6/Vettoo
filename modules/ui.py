@@ -46,13 +46,25 @@ def run_app():
             key="aggregate"
         )
 
-    # Qualification selector (always available; filters by TP if chosen)
+        # Qualification selector with search-as-you-type
+    # Build list based on TP selection
     if tps:
-        qual_options = available_quals(df, tps)
+        base_quals = available_quals(df, tps)
     else:
-        qual_options = sorted(df["Latest Qualification"].unique())
+        base_quals = sorted(df["Latest Qualification"].unique())
+    # Text input for filtering
+    qual_search = st.sidebar.text_input(
+        "Filter Qualifications",
+        value="",
+        key="qual_search"
+    )
+    # Filter list based on search term
+    if qual_search:
+        qual_options = [q for q in base_quals if qual_search.lower() in q.lower()]
+    else:
+        qual_options = base_quals
     quals = st.sidebar.multiselect(
-        "Qualification(s) (start typing to filter)",
+        "Qualification(s)",
         options=qual_options,
         default=[],
         disabled=aggregate,
