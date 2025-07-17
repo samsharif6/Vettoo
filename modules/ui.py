@@ -37,7 +37,20 @@ def run_app():
         key="tps"
     )
 
-    # Aggregate toggle (only if TP selected)
+        # Sidebar: qualification selector (always available; filters by TP if chosen)
+    if tps:
+        qual_options = available_quals(df, tps)
+    else:
+        qual_options = sorted(df["Latest Qualification"].unique())
+    quals = st.sidebar.multiselect(
+        "Qualification(s)",
+        options=qual_options,
+        default=[],
+        disabled=aggregate,
+        key="quals"
+    )
+
+    # Aggregate toggle (only if TP selected) (only if TP selected)
     aggregate = False
     if tps:
         aggregate = st.sidebar.checkbox(
@@ -46,38 +59,29 @@ def run_app():
             key="aggregate"
         )
 
-    # Sidebar: qualification selector (detailed view only; empty by default)
-    all_quals = available_quals(df, tps) if tps else []
-    quals = st.sidebar.multiselect(
-        "Qualification(s)\n(only shows aligned to selected TP)",
-        options=all_quals,
-        default=[],
-        disabled=aggregate,
-        key="quals"
-    )
-
-    # Show instructions until training package selected
-    if not tps:
+    # Show instructions until at least one filter selected
+    if not tps and not quals:
         st.write(
             """
             **Instructions**  
             1. Select a *Training Contract Status* from the sidebar.  
-            2. Choose one or more *Training Packages*.
-            3. Optionally check **Aggregate qualifications by Training Package**.
-            4. If **Aggregate** is unchecked, select at least one *Qualification*.
+            2. Choose one or more *Training Packages* and/or *Qualifications*.
+            3. Optionally check **Aggregate qualifications by Training Package** (requires TP selection).
             """
         )
         st.info(
-            "👉 Please select at least one *Training Package* to continue."
+            "👉 Please select at least one *Training Package* or *Qualification* to continue."
         )
         return
 
-    # For detailed view, if no quals selected, show all by default
-    if not aggregate and not quals:
-        quals = all_quals
+    # For detailed view, if no quals and TP chosen and not aggregating, default to all aligned
+    if tps and not aggregate and not quals:
+        quals = available_quals(df, tps)
 
-    # Filter data by package, then by qualification if not aggregating
-    sub_tp = filter_by_tp(df, tps)
+    # Filter data based on selections
+    # 1. Apply TP filter if any
+    sub_tp = filter_by_tp(df, tps) if tps else df
+    # 2. Apply qual filter if not aggregating
     sub = sub_tp if aggregate else filter_by_qual(sub_tp, quals)
 
     # Determine numeric (period) columns
@@ -91,7 +95,7 @@ def run_app():
     )
 
     # Aggregated view by Training Package
-    if aggregate:
+    if aggregate and tps:
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
         df_plot = agg_df.set_index("Training Packages")[numeric_cols].T
         df_plot.index = [shorten_label(c) for c in df_plot.index]
@@ -155,8 +159,8 @@ def run_app():
         metadata = {
             "Source": f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, {status} by 12 month series – South Australia",
             "Training Contract Status": status,
-            "Training Packages": ", ".join(tps),
-            "Qualifications": ", ".join(quals) if quals else "All aligned qualifications",
+            "Training Packages": ", ".join(tps) if tps else "None",
+            "Qualifications": ", ".join(quals) if quals else "None",
         }
         md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
@@ -166,5 +170,5 @@ def run_app():
         label="📥 Download data as Excel",
         data=towrite,
         file_name=file_name,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        mime="application/vnd.openxmlformats-officedocument-spreadsheetml.sheet"
     )
