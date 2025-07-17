@@ -114,15 +114,21 @@ def run_app():
     df_plot.index = [shorten_label(c) for c in df_plot.index]
     st.line_chart(df_plot)
 
-    # Prepare detailed table with totals row
+        # Prepare detailed table with totals row
     subtable = sub.copy()
     totals = subtable[numeric_cols].sum()
     totals_dict = {col: totals[col] for col in numeric_cols}
     totals_dict["Latest Qualification"] = "Total of selected items"
     table = pd.concat([subtable, pd.DataFrame([totals_dict])], ignore_index=True)
-    table_display = table.rename(columns={c: shorten_label(c) for c in numeric_cols})
+    # Select only desired columns
+    display_cols = ["Latest Qualification", "TDV", "Training Packages"] + numeric_cols
+    table = table[display_cols]
+    # Rename period columns for display
+    rename_map = {c: shorten_label(c) for c in numeric_cols}
+    table_display = table.rename(columns=rename_map)
 
     st.subheader("Data Table")
+    st.dataframe(table_display)("Data Table")
     st.dataframe(table_display)
 
     # Download detailed data
