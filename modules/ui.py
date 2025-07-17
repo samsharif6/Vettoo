@@ -42,18 +42,29 @@ def run_app():
             value=False
         )
 
-    # Sidebar: qualification selector (only when not aggregating)
-    if not aggregate:
-        all_quals = available_quals(df, tps) if tps else []
-        quals = st.sidebar.multiselect(
-            "Qualification(s)\n(only shows aligned to selected TP)",
-            options=all_quals,
-            default=[]
-        )
-    else:
-        quals = []  # ignore qualifications when aggregating
+    # Sidebar: qualification selector (detailed view only; empty by default)
+all_quals = available_quals(df, tps) if tps else []
+quals = st.sidebar.multiselect(
+    "Qualification(s)
+(only shows aligned to selected TP)",
+    options=all_quals,
+    default=[],
+    disabled=aggregate
+)
 
-    # Show instructions until valid selection
+# Show instructions until training package selected
+if not tps:
+    st.write(
+        """
+        **Instructions**  
+        1. Select a *Training Contract Status* from the sidebar.  
+        2. Choose one or more *Training Packages*.
+        """
+    )
+    st.info(
+        "👉 Please select at least one *Training Package* to continue."
+    )
+    return
     if not tps or (not aggregate and not quals):
         st.write(
             """
