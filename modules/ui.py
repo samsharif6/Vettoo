@@ -20,7 +20,6 @@ def run_app():
     st.set_page_config(page_title="Vettoo Dashboard", layout="wide")
     st.title("🤖 Vettoo")
     st.subheader("Click less. Know more.")
-    st.subheader("Your data buddy in the VET world.")
 
     # Sidebar: status selector
     dl = DataLoader()
