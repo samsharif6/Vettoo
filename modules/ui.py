@@ -3,7 +3,7 @@
 import io
 import pandas as pd
 import streamlit as st
-from modules.data_loader import DataLoader
+import plotly.express as px
 from modules.filters import filter_by_tp, filter_by_qual, available_quals
 
 
@@ -131,16 +131,42 @@ def run_app():
         f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia"
     )
 
-    # Plot
+        # Plot
     if aggregate and tps:
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
-        df_plot = agg_df.set_index("Training Packages")[numeric_cols].T
-        df_plot.index = [shorten_label(c) for c in df_plot.index]
-        st.line_chart(df_plot)
+        # transpose for time on x-axis
+        df_long = agg_df.melt(id_vars="Training Packages", value_vars=numeric_cols,
+                              var_name="Period", value_name="Value")
+        fig = px.line(
+            df_long,
+            x="Period",
+            y="Value",
+            color="Training Packages",
+            markers=True,
+            title="Aggregated by Training Package"
+        )
+        # move legend to right
+        fig.update_layout(
+            legend=dict(orientation="v", x=1.02, y=1),
+            margin=dict(r=200)
+        )
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        df_plot = sub.set_index("Latest Qualification")[numeric_cols].T
-        df_plot.index = [shorten_label(c) for c in df_plot.index]
-        st.line_chart(df_plot)
+        df_long = sub.melt(id_vars="Latest Qualification", value_vars=numeric_cols,
+                           var_name="Period", value_name="Value")
+        fig = px.line(
+            df_long,
+            x="Period",
+            y="Value",
+            color="Latest Qualification",
+            markers=True,
+            title="Qualifications over Time"
+        )
+        fig.update_layout(
+            legend=dict(orientation="v", x=1.02, y=1),
+            margin=dict(r=200)
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     # Data table
     st.subheader("Data Table")
