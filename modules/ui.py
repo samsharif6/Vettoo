@@ -22,12 +22,10 @@ def run_app():
     st.subheader("Click less. Know more.")
     st.subheader("Your data buddy in the VET world.")
 
-            # Reset button
+                # Reset button: full page reload
     if st.sidebar.button("Reset selections"):
-        for key in ["status", "tps", "aggregate", "quals"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        # State cleared; selections will revert to defaults
+        st.markdown("<script>window.location.reload()</script>", unsafe_allow_html=True)
+        return
 
     # Sidebar: status selector
     dl = DataLoader()
