@@ -37,7 +37,16 @@ def run_app():
         key="tps"
     )
 
-        # Sidebar: qualification selector (always available; filters by TP if chosen)
+    # Aggregate toggle (only if TP selected)
+    aggregate = False
+    if tps:
+        aggregate = st.sidebar.checkbox(
+            "Aggregate qualifications by Training Package",
+            value=False,
+            key="aggregate"
+        )
+
+    # Sidebar: qualification selector (always available; filters by TP if chosen)
     if tps:
         qual_options = available_quals(df, tps)
     else:
@@ -49,15 +58,6 @@ def run_app():
         disabled=aggregate,
         key="quals"
     )
-
-    # Aggregate toggle (only if TP selected) (only if TP selected)
-    aggregate = False
-    if tps:
-        aggregate = st.sidebar.checkbox(
-            "Aggregate qualifications by Training Package",
-            value=False,
-            key="aggregate"
-        )
 
     # Show instructions until at least one filter selected
     if not tps and not quals:
