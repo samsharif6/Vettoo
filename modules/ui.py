@@ -44,11 +44,11 @@ def run_app():
     else:
         qual_options = sorted(df["Latest Qualification"].unique())
     quals = st.sidebar.multiselect(
-        "Qualification(s)
-(start typing to filter)",
+        "Qualification(s) (start typing to filter)",
         options=qual_options,
         default=[],
         key="quals"
+    )
     )
 
     # Aggregate toggle
