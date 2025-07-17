@@ -28,15 +28,10 @@ def run_app():
     )
     df = dl.load_status(status)
 
-    # Sidebar: filters
+    # Sidebar: training package selector
     tps = st.sidebar.multiselect(
         "Training Package(s)",
         options=sorted(df["Training Packages"].unique())
-    )
-    # Qualification options depend on selected TPs
-    quals = st.sidebar.multiselect(
-        "Qualification(s)\n(only shows aligned to selected TP)",
-        options=available_quals(df, tps) if tps else []
     )
 
     # Aggregate toggle (only if TP selected)
@@ -47,29 +42,41 @@ def run_app():
             value=False
         )
 
+    # Sidebar: qualification selector (only when not aggregating)
+    if not aggregate:
+        quals = st.sidebar.multiselect(
+            "Qualification(s)\n(only shows aligned to selected TP)",
+            options=available_quals(df, tps) if tps else []
+        )
+    else:
+        quals = []  # ignore qualifications when aggregating
+
     # Show instructions until selection
-    if not tps and not quals:
+    if not tps or (not aggregate and not quals):
         st.write(
             """
             **Instructions**  
             1. Select a *Training Contract Status* from the sidebar.  
-            2. Choose one or more *Training Packages* and/or *Qualifications*.  
-            3. Optionally check the aggregation box to roll up by package.  
+            2. Choose one or more *Training Packages*.  
+            3. Optionally check **Aggregate qualifications by Training Package**.  
+            4. If **Aggregate** is unchecked, you can also select Qualifications.  
             """
         )
         st.info(
-            "👉 Please select at least one *Training Package* or *Qualification* from the sidebar to continue."
+            "👉 Please select at least one *Training Package*, and if not aggregating, at least one *Qualification*."
         )
         return
 
-    # Filter data
-    sub = filter_by_tp(df, tps)
-    sub = filter_by_qual(sub, quals)
+    # Filter data by package, then by qualification if not aggregating
+    sub_tp = filter_by_tp(df, tps)
+    if aggregate:
+        sub = sub_tp
+    else:
+        sub = filter_by_qual(sub_tp, quals)
 
     # Determine numeric (period) columns
     numeric_cols = [c for c in sub.columns if pd.api.types.is_numeric_dtype(sub[c])]
-    latest_period = numeric_cols[-1] if numeric_cols else ""
-    latest_period_simple = shorten_label(latest_period)
+    latest_period_simple = shorten_label(numeric_cols[-1]) if numeric_cols else ""
 
     # Header and subtitle
     st.header(f"{status} — Selected Data")
@@ -77,16 +84,16 @@ def run_app():
         f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, Contract status by 12 month series – South Australia"
     )
 
-    # Aggregated view by Training Package
-    if aggregate and tps:
+    ### Aggregated view by Training Package ###
+    if aggregate:
         # Group and sum numeric columns by Training Packages
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
-        # Prepare for plotting: periods on x, packages as lines
+        # Plot: periods as x-axis, packages as lines
         df_plot = agg_df.set_index("Training Packages")[numeric_cols].T
         df_plot.index = [shorten_label(c) for c in df_plot.index]
         st.line_chart(df_plot)
 
-        # Show aggregated table (packages + periods)
+        # Show aggregated table
         st.subheader("Aggregated Data Table")
         table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
         st.dataframe(table_display)
@@ -105,13 +112,13 @@ def run_app():
         )
         return
 
-    # Detailed view by Qualification
+    ### Detailed view by Qualification ###
     # Plot qualifications over time
     df_plot = sub.set_index("Latest Qualification")[numeric_cols].T
     df_plot.index = [shorten_label(c) for c in df_plot.index]
     st.line_chart(df_plot)
 
-    # Detailed data table with totals row
+    # Prepare detailed table with totals row
     subtable = sub.copy()
     totals = subtable[numeric_cols].sum()
     totals_dict = {col: totals[col] for col in numeric_cols}
@@ -134,4 +141,3 @@ def run_app():
         file_name=file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-```
