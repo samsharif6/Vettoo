@@ -43,49 +43,36 @@ def run_app():
         )
 
     # Sidebar: qualification selector (detailed view only; empty by default)
-all_quals = available_quals(df, tps) if tps else []
-quals = st.sidebar.multiselect(
-    "Qualification(s)
-(only shows aligned to selected TP)",
-    options=all_quals,
-    default=[],
-    disabled=aggregate
-)
+    all_quals = available_quals(df, tps) if tps else []
+    quals = st.sidebar.multiselect(
+        "Qualification(s)\n(only shows aligned to selected TP)",
+        options=all_quals,
+        default=[],
+        disabled=aggregate
+    )
 
-# Show instructions until training package selected
-if not tps:
-    st.write(
-        """
-        **Instructions**  
-        1. Select a *Training Contract Status* from the sidebar.  
-        2. Choose one or more *Training Packages*.
-        """
-    )
-    st.info(
-        "👉 Please select at least one *Training Package* to continue."
-    )
-    return
-    if not tps or (not aggregate and not quals):
+    # Show instructions until training package selected
+    if not tps:
         st.write(
             """
             **Instructions**  
             1. Select a *Training Contract Status* from the sidebar.  
-            2. Choose one or more *Training Packages*.  
-            3. Optionally check **Aggregate qualifications by Training Package**.  
-            4. If **Aggregate** is unchecked, select at least one *Qualification* to display detailed data.  
+            2. Choose one or more *Training Packages*.
             """
         )
         st.info(
-            "👉 Please select at least one *Training Package*, and if not aggregating, at least one *Qualification*."
+            "👉 Please select at least one *Training Package* to continue."
         )
         return
 
+    # For detailed view, require at least one qualification
+    if not aggregate and not quals:
+        # Show all qualifications by default in detailed view
+        quals = all_quals
+
     # Filter data by package, then by qualification if not aggregating
     sub_tp = filter_by_tp(df, tps)
-    if aggregate:
-        sub = sub_tp
-    else:
-        sub = filter_by_qual(sub_tp, quals)
+    sub = sub_tp if aggregate else filter_by_qual(sub_tp, quals)
 
     # Determine numeric (period) columns
     numeric_cols = [c for c in sub.columns if pd.api.types.is_numeric_dtype(sub[c])]
@@ -97,7 +84,7 @@ if not tps:
         f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, Contract status by 12 month series – South Australia"
     )
 
-    ### Aggregated view by Training Package ###
+    # Aggregated view by Training Package
     if aggregate:
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
         df_plot = agg_df.set_index("Training Packages")[numeric_cols].T
@@ -108,6 +95,7 @@ if not tps:
         table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
         st.dataframe(table_display)
 
+        # Download aggregated data
         towrite = io.BytesIO()
         with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
             table_display.to_excel(writer, index=False, sheet_name="Data")
@@ -121,11 +109,12 @@ if not tps:
         )
         return
 
-    ### Detailed view by Qualification ###
+    # Detailed view by Qualification
     df_plot = sub.set_index("Latest Qualification")[numeric_cols].T
     df_plot.index = [shorten_label(c) for c in df_plot.index]
     st.line_chart(df_plot)
 
+    # Prepare detailed table with totals row
     subtable = sub.copy()
     totals = subtable[numeric_cols].sum()
     totals_dict = {col: totals[col] for col in numeric_cols}
@@ -136,6 +125,7 @@ if not tps:
     st.subheader("Data Table")
     st.dataframe(table_display)
 
+    # Download detailed data
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
         table.to_excel(writer, index=False, sheet_name="Data")
