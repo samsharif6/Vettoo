@@ -3,6 +3,7 @@
 import io
 import pandas as pd
 import streamlit as st
+import plotly.express as px
 from modules.data_loader import DataLoader
 from modules.filters import filter_by_tp, filter_by_qual, available_quals
 
@@ -16,12 +17,12 @@ def shorten_label(c: str) -> str:
 
 
 def run_app():
-    # Configure page
+    # Page config
     st.set_page_config(page_title="Vettoo Dashboard", layout="wide")
     st.title("🤖 Vettoo")
     st.subheader("Click less. Know more.")
 
-    # Sidebar: status selector
+    # Load data
     dl = DataLoader()
     status = st.sidebar.selectbox(
         "Training Contract Status",
@@ -30,14 +31,30 @@ def run_app():
     )
     df = dl.load_status(status)
 
-    # Sidebar: training package selector
+    # Training package selector
     tps = st.sidebar.multiselect(
         "Training Package(s)",
         options=sorted(df["Training Packages"].unique()),
         key="tps"
     )
 
-    # Aggregate toggle (only if TP selected)
+    # Qualification search and selector
+    # Determine qual options based on TP selection
+    if tps:
+        base = available_quals(df, tps)
+    else:
+        base = sorted(df["Latest Qualification"].unique())
+    query = st.sidebar.text_input("Search qualifications...")
+    qual_options = [q for q in base if query.lower() in q.lower()]
+    quals = st.sidebar.multiselect(
+        "Qualification(s)",
+        options=qual_options,
+        default=[],
+        disabled=False,
+        key="quals"
+    )
+
+    # Aggregate toggle
     aggregate = False
     if tps:
         aggregate = st.sidebar.checkbox(
@@ -46,129 +63,99 @@ def run_app():
             key="aggregate"
         )
 
-    # Sidebar: qualification selector (always available; filters by TP if chosen)
-    if tps:
-        qual_options = available_quals(df, tps)
-    else:
-        qual_options = sorted(df["Latest Qualification"].unique())
-    quals = st.sidebar.multiselect(
-        "Qualification(s)",
-        options=qual_options,
-        default=[],
-        disabled=aggregate,
-        key="quals"
+    # Date period slider
+    # Identify all period columns
+    all_periods = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    sorted_periods = sorted(all_periods)
+    start, end = st.sidebar.select_slider(
+        "Select period range",
+        options=sorted_periods,
+        value=(sorted_periods[0], sorted_periods[-1])
     )
+    start_idx = sorted_periods.index(start)
+    end_idx = sorted_periods.index(end)
+    period_range = sorted_periods[start_idx:end_idx+1]
 
-    # Show instructions until at least one filter selected
+    # Instruction guard
     if not tps and not quals:
         st.write(
             """
             **Instructions**  
-            1. Select a *Training Contract Status* from the sidebar.  
-            2. Choose one or more *Training Packages* and/or *Qualifications*.
-            3. Optionally check **Aggregate qualifications by Training Package** (requires TP selection).
+            1. Choose a *Training Contract Status*.  
+            2. Select one or more *Training Packages* and/or *Qualifications*.  
+            3. Optionally check **Aggregate by Package**.  
+            4. Use the **period slider** to zoom on date range.
             """
         )
-        st.info(
-            "👉 Please select at least one *Training Package* or *Qualification* to continue."
-        )
+        st.info("👉 Please select at least one package or qualification to proceed.")
         return
 
-    # For detailed view, if no quals and TP chosen and not aggregating, default to all aligned
+    # Default quals if none selected but TP chosen and not aggregating
     if tps and not aggregate and not quals:
         quals = available_quals(df, tps)
 
-    # Filter data based on selections
-    # 1. Apply TP filter if any
-    sub_tp = filter_by_tp(df, tps) if tps else df
-    # 2. Apply qual filter if not aggregating
-    sub = sub_tp if aggregate else filter_by_qual(sub_tp, quals)
+    # Filtering
+    sub = df
+    if tps:
+        sub = filter_by_tp(sub, tps)
+    if not aggregate and quals:
+        sub = filter_by_qual(sub, quals)
 
-    # Determine numeric (period) columns
-    numeric_cols = [c for c in sub.columns if pd.api.types.is_numeric_dtype(sub[c])]
-    latest_period_simple = shorten_label(numeric_cols[-1]) if numeric_cols else ""
+    # Subset periods
+    numeric_cols = [c for c in period_range]
+    latest = numeric_cols[-1] if numeric_cols else ""
 
-    # Header and subtitle
+    # Header
     st.header(f"{status} — 12-month Data")
-    st.write(
-        f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, {status} by 12 month series – South Australia"
-    )
+    st.write(f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia")
 
-    # Aggregated view by Training Package
+    # Plot
     if aggregate and tps:
-        agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
-        df_plot = agg_df.set_index("Training Packages")[numeric_cols].T
-        df_plot.index = [shorten_label(c) for c in df_plot.index]
-        st.line_chart(df_plot)
-
-        st.subheader("Aggregated Data Table")
-        table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
-        st.dataframe(table_display)
-
-        # Download aggregated data with metadata
-        towrite = io.BytesIO()
-        with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
-            # Data sheet
-            table_display.to_excel(writer, index=False, sheet_name="Data")
-            # Metadata sheet
-            metadata = {
-                "Source": f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, {status} by 12 month series – South Australia",
-                "Training Contract Status": status,
-                "Training Packages": ", ".join(tps),
-                "Qualifications": "(aggregated by package)",
-            }
-            md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
-            md_df.to_excel(writer, index=False, sheet_name="Metadata")
-        towrite.seek(0)
-        file_name = f"{status.lower().replace(' ', '_')}_by_package.xlsx"
-        st.download_button(
-            label="📥 Download aggregated data as Excel",
-            data=towrite,
-            file_name=file_name,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        data = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
+        melt = data.melt(id_vars="Training Packages", value_vars=numeric_cols,
+                         var_name="Period", value_name="Value")
+        fig = px.line(
+            melt, x="Period", y="Value", color="Training Packages",
+            markers=True, title="Aggregated by Training Package"
         )
-        return
+    else:
+        data = sub.copy()
+        melt = data.melt(id_vars="Latest Qualification", value_vars=numeric_cols,
+                         var_name="Period", value_name="Value")
+        fig = px.line(
+            melt, x="Period", y="Value", color="Latest Qualification",
+            markers=True, title="Qualifications over Time"
+        )
+    fig.update_layout(xaxis_title="Period", yaxis_title="Count", hovermode="x unified")
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Detailed view by Qualification
-    df_plot = sub.set_index("Latest Qualification")[numeric_cols].T
-    df_plot.index = [shorten_label(c) for c in df_plot.index]
-    st.line_chart(df_plot)
-
-    # Prepare detailed table with totals row
-    subtable = sub.copy()
-    totals = subtable[numeric_cols].sum()
-    totals_dict = {col: totals[col] for col in numeric_cols}
-    totals_dict["Latest Qualification"] = "Total of selected items"
-    table = pd.concat([subtable, pd.DataFrame([totals_dict])], ignore_index=True)
-    # Select only desired columns
-    display_cols = ["Latest Qualification", "TDV", "Training Packages"] + numeric_cols
-    table = table[display_cols]
-    # Rename period columns for display
-    rename_map = {c: shorten_label(c) for c in numeric_cols}
-    table_display = table.rename(columns=rename_map)
-
+    # Table
     st.subheader("Data Table")
-    st.dataframe(table_display)
+    if aggregate and tps:
+        tbl = data.rename(columns={c: shorten_label(c) for c in numeric_cols})
+    else:
+        tbl = pd.concat([
+            sub[["Latest Qualification","TDV","Training Packages"] + numeric_cols],
+            pd.DataFrame([{"Latest Qualification":"Total of selected items", **{c: sub[c].sum() for c in numeric_cols}}])
+        ], ignore_index=True)
+        tbl = tbl.rename(columns={c: shorten_label(c) for c in numeric_cols})
+    st.dataframe(tbl)
 
-    # Download detailed data with metadata
+    # Download
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
-        # Data sheet
-        table_display.to_excel(writer, index=False, sheet_name="Data")
-        # Metadata sheet
+        tbl.to_excel(writer, index=False, sheet_name="Data")
+        # metadata
         metadata = {
-            "Source": f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, {status} by 12 month series – South Australia",
-            "Training Contract Status": status,
+            "Source": f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia",
+            "Period Range": f"{start} to {end}",
             "Training Packages": ", ".join(tps) if tps else "None",
-            "Qualifications": ", ".join(quals) if quals else "None",
+            "Qualifications": ", ".join(quals) if quals else "None"
         }
-        md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
+        md_df = pd.DataFrame(list(metadata.items()), columns=["Description","Value"])
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
-    file_name = f"{status.lower().replace(' ', '_')}_NCVER_data.xlsx"
-    st.download_button(
-        label="📥 Download data as Excel",
-        data=towrite,
-        file_name=file_name,
-        mime="application/vnd.openxmlformats-officedocument-spreadsheetml.sheet"
-    )
+    fname = f"{status.lower().replace(' ','_')}_data_{start}_to_{end}.xlsx"
+    st.download_button("📥 Download data as Excel", data=towrite,
+                       file_name=fname,
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
