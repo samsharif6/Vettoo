@@ -48,24 +48,24 @@ def run_app():
         quals = st.sidebar.multiselect(
             "Qualification(s)\n(only shows aligned to selected TP)",
             options=all_quals,
-            default=all_quals
+            default=[]
         )
     else:
         quals = []  # ignore qualifications when aggregating
 
-    # Show instructions until training package selection
-    if not tps:
+    # Show instructions until valid selection
+    if not tps or (not aggregate and not quals):
         st.write(
             """
             **Instructions**  
             1. Select a *Training Contract Status* from the sidebar.  
             2. Choose one or more *Training Packages*.  
             3. Optionally check **Aggregate qualifications by Training Package**.  
-            4. If **Aggregate** is unchecked, qualifications will all be shown by default (or you can refine further).
+            4. If **Aggregate** is unchecked, select at least one *Qualification* to display detailed data.  
             """
         )
         st.info(
-            "👉 Please select at least one *Training Package* to continue."
+            "👉 Please select at least one *Training Package*, and if not aggregating, at least one *Qualification*."
         )
         return
 
