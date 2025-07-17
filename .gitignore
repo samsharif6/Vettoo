@@ -1,0 +1,10 @@
+# Byte‑compiled / optimized files
+__pycache__/
+*.py[cod]
+
+# Streamlit cache
+.streamlit/
+
+# System files
+.DS_Store
+Thumbs.db
