@@ -37,7 +37,7 @@ def run_app():
         key="tps"
     )
 
-    # Aggregate toggle (only if TP selected)
+    # Aggregate toggle
     aggregate = False
     if tps:
         aggregate = st.sidebar.checkbox(
@@ -46,79 +46,75 @@ def run_app():
             key="aggregate"
         )
 
-    # Qualification selector (always available; filters by TP if chosen)
+    # Qualification selector
     if tps:
-        qual_options = available_quals(df, tps)
+        base_quals = available_quals(df, tps)
     else:
-        qual_options = sorted(df["Latest Qualification"].unique())
+        base_quals = sorted(df["Latest Qualification"].unique())
     quals = st.sidebar.multiselect(
         "Qualification(s)",
-        options=qual_options,
+        options=base_quals,
         default=[],
         disabled=aggregate,
         key="quals"
     )
 
-    # Year range slider: extract unique years from period columns
+    # Year range slider
     all_numeric = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
     years_int = sorted({int(c.split('_')[-1]) for c in all_numeric})
-    start_year, end_year = st.sidebar.select_slider(
-        "Select Year Range",
-        options=years_int,
-        value=(years_int[0], years_int[-1]) if years_int else (None, None),
-        key="year_range"
-    )
+    if years_int:
+        start_year, end_year = st.sidebar.select_slider(
+            "Select Year Range",
+            options=years_int,
+            value=(years_int[0], years_int[-1]),
+            key="year_range"
+        )
+    else:
+        start_year, end_year = None, None
 
-        # If only status is selected (no TP and no quals), read aggregated results from SA sheet
+    # If only status selected: load SA sheet
     if not tps and not quals:
-        # Load SA aggregation sheet
         sa_df = pd.read_excel(dl.file_path, sheet_name="SA")
-        # Extract numeric period columns within selected year range
-        numeric_cols = [
-            c for c in sa_df.columns
-            if pd.api.types.is_numeric_dtype(sa_df[c])
-            and start_year <= int(c.split('_')[-1]) <= end_year
-        ]
-        latest_period = numeric_cols[-1] if numeric_cols else ""
+        # filter years
+        if years_int:
+            numeric_cols = [
+                c for c in sa_df.columns
+                if pd.api.types.is_numeric_dtype(sa_df[c])
+                and start_year <= int(c.split('_')[-1]) <= end_year
+            ]
+        else:
+            numeric_cols = []
+        latest = numeric_cols[-1] if numeric_cols else ""
 
         st.header(f"{status} — 12-month Data")
         st.write(
-            f"NCVER, Apprentices and trainees – {shorten_label(latest_period)} DataBuilder, {status} by 12 month series – South Australia"
+            f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia"
         )
-        # Filter row for selected status
         row = sa_df.loc[sa_df['Training Contract Status'] == status, numeric_cols]
         if row.empty:
-            st.warning(f"No aggregated data found for {status} in SA sheet.")
+            st.warning(f"No aggregated data for {status} in SA sheet.")
             return
         totals = row.squeeze()
-
-        # Plot single total line
-        df_plot = pd.DataFrame({status: totals}).T
-        df_plot = df_plot.T
-        df_plot.index = [shorten_label(c) for c in df_plot.index]
+        # plot
+        df_plot = pd.DataFrame(totals.values, index=[shorten_label(c) for c in numeric_cols], columns=[status])
         st.line_chart(df_plot)
-
-        # Show total table
-        total_row = {"Latest Qualification": f"Total {status}"}
-        total_row.update({c: totals[c] for c in numeric_cols})
-        table_display = pd.DataFrame([total_row])
-        table_display = table_display.rename(columns={c: shorten_label(c) for c in numeric_cols})
+        # table
+        table_display = pd.DataFrame([{
+            "Latest Qualification": f"Total {status}",
+            **{shorten_label(c): totals[c] for c in numeric_cols}
+        }])
         st.subheader("Aggregated Data Table")
         st.dataframe(table_display)
         return
 
-    # Default qualifications logic
-    if tps and not aggregate and not quals:
-        quals = available_quals(df, tps)
-
-    # Filter data based on selections
-    sub = df
+    # Filter data
+    sub = df.copy()
     if tps:
         sub = filter_by_tp(sub, tps)
     if not aggregate and quals:
         sub = filter_by_qual(sub, quals)
 
-    # Determine numeric (period) columns within selected year range
+    # Determine numeric columns in range
     if years_int:
         numeric_cols = [
             c for c in sub.columns
@@ -127,12 +123,12 @@ def run_app():
         ]
     else:
         numeric_cols = []
-    latest_period = numeric_cols[-1] if numeric_cols else ""
+    latest = numeric_cols[-1] if numeric_cols else ""
 
     # Header and subtitle
     st.header(f"{status} — 12-month Data")
     st.write(
-        f"NCVER, Apprentices and trainees – {shorten_label(latest_period)} DataBuilder, {status} by 12 month series – South Australia"
+        f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia"
     )
 
     # Plot
@@ -151,21 +147,21 @@ def run_app():
     if aggregate and tps:
         table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
     else:
-        subtable = sub.copy()
-        totals = subtable[numeric_cols].sum()
-        totals_dict = {col: totals[col] for col in numeric_cols}
-        totals_dict["Latest Qualification"] = "Total of selected items"
-        table = pd.concat([subtable, pd.DataFrame([totals_dict])], ignore_index=True)
+        totals = sub[numeric_cols].sum()
+        table = pd.concat([sub, pd.DataFrame([{
+            "Latest Qualification": "Total of selected items",
+            **{c: totals[c] for c in numeric_cols}
+        }])], ignore_index=True)
         display_cols = ["Latest Qualification", "TDV", "Training Packages"] + numeric_cols
         table_display = table[display_cols].rename(columns={c: shorten_label(c) for c in numeric_cols})
     st.dataframe(table_display)
 
-    # Download data with metadata
+    # Download with metadata
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
         table_display.to_excel(writer, index=False, sheet_name="Data")
         metadata = {
-            "Source": f"NCVER, Apprentices and trainees – {shorten_label(latest_period)} DataBuilder, {status} by 12 month series – South Australia",
+            "Source": f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia",
             "Training Contract Status": status,
             "Training Packages": ", ".join(tps) if tps else "None",
             "Qualifications": ", ".join(quals) if quals else "None",
@@ -174,27 +170,10 @@ def run_app():
         md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
-        file_name = f"{status.lower().replace(' ', '_')}_data_{start_year}_to_{end_year}.xlsx"
+    fname = f"{status.lower().replace(' ', '_')}_data_{start_year}_to_{end_year}.xlsx"
     st.download_button(
         label="📥 Download data as Excel",
         data=towrite,
-        file_name=file_name,
+        file_name=fname,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )(
-        label="📥 Download data as Excel",
-        data=towrite,
-        file_name=file_name,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    # Footer disclaimer
-    st.markdown(
-        """
-        <div style='font-size:12px; color:gray; text-align:center; padding-top:20px;'>
-        This platform includes data from the National Centre for Vocational Education Research (NCVER) under a Creative Commons Attribution 3.0 Australia licence.<br>
-        The views and interpretations expressed are those of the author and do not necessarily reflect the views of NCVER.<br><br>
-        © NCVER and the Commonwealth of Australia. All rights reserved. Some images, logos, and visual design elements may be subject to separate copyright.
-        </div>
-        """,
-        unsafe_allow_html=True
     )
