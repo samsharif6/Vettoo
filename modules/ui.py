@@ -59,13 +59,15 @@ def run_app():
         key="quals"
     )
 
-    # Year filter: extract unique years from annual columns
-    # Identify all numeric period columns
+        # Year range slider: extract unique years from annual columns
     all_numeric = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
-    # Get years by splitting on '_' and taking last 4 chars
-    year_options = sorted({c.split('_')[-1] for c in all_numeric})
-    years = st.sidebar.multiselect(
-        "Year(s)",
+    years_int = sorted({int(c.split('_')[-1]) for c in all_numeric})
+    start_year, end_year = st.sidebar.select_slider(
+        "Select Year Range",
+        options=years_int,
+        value=(years_int[0], years_int[-1]),
+        key="year_range"
+    )",
         options=year_options,
         default=year_options,
         key="years"
@@ -98,10 +100,13 @@ def run_app():
     if not aggregate and quals:
         sub = filter_by_qual(sub, quals)
 
-    # Filter numeric columns by selected years
-    numeric_cols = [c for c in sub.columns if pd.api.types.is_numeric_dtype(sub[c])]
-    filtered_periods = [c for c in numeric_cols if c.split('_')[-1] in years]
-    numeric_cols = filtered_periods
+        # Filter numeric columns by selected year range
+    numeric_cols = [
+        c for c in sub.columns
+        if pd.api.types.is_numeric_dtype(sub[c]) and
+           start_year <= int(c.split('_')[-1]) <= end_year
+    ]
+    latest_period = numeric_cols[-1] if numeric_cols else ""
     latest_period = numeric_cols[-1] if numeric_cols else ""
 
     # Header and subtitle
@@ -130,9 +135,7 @@ def run_app():
                 "Training Contract Status": status,
                 "Training Packages": ", ".join(tps),
                 "Qualifications": "(aggregated by package)",
-                "Years": ", ".join(years)
-            }
-            md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
+                "Years": f"{start_year} to {end_year}", "Value"])
             md_df.to_excel(writer, index=False, sheet_name="Metadata")
         towrite.seek(0)
         file_name = f"{status.lower().replace(' ', '_')}_by_package.xlsx"
