@@ -177,3 +177,15 @@ def run_app():
         file_name=fname,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+    # Footer disclaimer
+    st.markdown(
+        """
+        <div style='font-size:12px; color:gray; text-align:center; padding-top:20px;'>
+        This platform includes data from the National Centre for Vocational Education Research (NCVER) under a Creative Commons Attribution 3.0 Australia licence.<br>
+        The views and interpretations expressed are those of the author and do not necessarily reflect the views of NCVER.<br><br>
+        © NCVER and the Commonwealth of Australia. All rights reserved. Some images, logos, and visual design elements may be subject to separate copyright.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
