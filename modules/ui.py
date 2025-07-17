@@ -18,7 +18,8 @@ def shorten_label(c: str) -> str:
 def run_app():
     # Configure page
     st.set_page_config(page_title="Vettoo Dashboard", layout="wide")
-    st.title("Vettoo Qualifications Dashboard")
+    st.title("Vettoo – Your data buddy in the VET world.")
+    st.subheader("Click less. Know more.")
 
     # Sidebar: status selector
     dl = DataLoader()
@@ -65,9 +66,8 @@ def run_app():
         )
         return
 
-    # For detailed view, require at least one qualification
+    # For detailed view, if no quals selected, show all by default
     if not aggregate and not quals:
-        # Show all qualifications by default in detailed view
         quals = all_quals
 
     # Filter data by package, then by qualification if not aggregating
@@ -79,9 +79,9 @@ def run_app():
     latest_period_simple = shorten_label(numeric_cols[-1]) if numeric_cols else ""
 
     # Header and subtitle
-    st.header(f"{status} — Selected Data")
+    st.header(f"{status} — 12-month Data")
     st.write(
-        f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, Contract status by 12 month series – South Australia"
+        f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, {status} by 12 month series – South Australia"
     )
 
     # Aggregated view by Training Package
@@ -95,10 +95,20 @@ def run_app():
         table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
         st.dataframe(table_display)
 
-        # Download aggregated data
+        # Download aggregated data with metadata
         towrite = io.BytesIO()
         with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
+            # Data sheet
             table_display.to_excel(writer, index=False, sheet_name="Data")
+            # Metadata sheet
+            metadata = {
+                "Source": f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, {status} by 12 month series – South Australia",
+                "Training Contract Status": status,
+                "Training Packages": ", ".join(tps),
+                "Qualifications": "(aggregated by package)",
+            }
+            md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
+            md_df.to_excel(writer, index=False, sheet_name="Metadata")
         towrite.seek(0)
         file_name = f"{status.lower().replace(' ', '_')}_by_package.xlsx"
         st.download_button(
@@ -109,7 +119,7 @@ def run_app():
         )
         return
 
-        # Detailed view by Qualification
+    # Detailed view by Qualification
     df_plot = sub.set_index("Latest Qualification")[numeric_cols].T
     df_plot.index = [shorten_label(c) for c in df_plot.index]
     st.line_chart(df_plot)
@@ -130,10 +140,20 @@ def run_app():
     st.subheader("Data Table")
     st.dataframe(table_display)
 
-    # Download detailed data
+    # Download detailed data with metadata
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
-        table.to_excel(writer, index=False, sheet_name="Data")
+        # Data sheet
+        table_display.to_excel(writer, index=False, sheet_name="Data")
+        # Metadata sheet
+        metadata = {
+            "Source": f"NCVER, Apprentices and trainees – {latest_period_simple} DataBuilder, {status} by 12 month series – South Australia",
+            "Training Contract Status": status,
+            "Training Packages": ", ".join(tps),
+            "Qualifications": ", ".join(quals) if quals else "All aligned qualifications",
+        }
+        md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
+        md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
     file_name = f"{status.lower().replace(' ', '_')}_NCVER_data.xlsx"
     st.download_button(
