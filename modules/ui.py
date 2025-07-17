@@ -128,7 +128,7 @@ def run_app():
     table_display = table.rename(columns=rename_map)
 
     st.subheader("Data Table")
-    st.dataframe(table_display)("Data Table")
+    st.dataframe(table_display)
     st.dataframe(table_display)
 
     # Download detailed data
