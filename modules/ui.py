@@ -74,6 +74,9 @@ def run_app():
     df_plot = sub.set_index("Latest Qualification")[numeric_cols]
     df_plot = df_plot.T  # periods as index
     df_plot.index = [shorten_label(c) for c in df_plot.index]
+    df_plot.index = pd.CategoricalIndex(df_plot.index, ordered=True, categories=sorted(df_plot.index))
+    df_plot = df_plot.sort_index()
+
     st.line_chart(df_plot)
 
     # Prepare data table
@@ -92,16 +95,18 @@ def run_app():
     # Display table
     st.subheader("Data Table")
     st.dataframe(table_display)
-
+    
     # Provide download button for Excel
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
         table.to_excel(writer, index=False, sheet_name="Data")
     towrite.seek(0)
 
-    st.download_button(
-        label="📥 Download data as Excel",
-        data=towrite,
-        file_name=f"{status.replace(' ', '_')}_data.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    file_name = f"{status.lower().replace(' ', '_')}_NCVER_data.xlsx"  # ← Add this
+
+st.download_button(
+    label="📥 Download data as Excel",
+    data=towrite,
+    file_name=file_name,  # ← Use it here
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
