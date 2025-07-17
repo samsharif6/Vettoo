@@ -174,8 +174,13 @@ def run_app():
         md_df = pd.DataFrame(list(metadata.items()), columns=["Description", "Value"])
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
-    file_name = f"{status.lower().replace(' ', '_')}_data_{start_year}_to_{end_year}.xlsx"
-        st.download_button(
+        file_name = f"{status.lower().replace(' ', '_')}_data_{start_year}_to_{end_year}.xlsx"
+    st.download_button(
+        label="📥 Download data as Excel",
+        data=towrite,
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )(
         label="📥 Download data as Excel",
         data=towrite,
         file_name=file_name,
