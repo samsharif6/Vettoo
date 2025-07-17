@@ -4,6 +4,7 @@ import io
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+from modules.data_loader import DataLoader
 from modules.filters import filter_by_tp, filter_by_qual, available_quals
 
 
