@@ -44,26 +44,28 @@ def run_app():
 
     # Sidebar: qualification selector (only when not aggregating)
     if not aggregate:
+        all_quals = available_quals(df, tps) if tps else []
         quals = st.sidebar.multiselect(
             "Qualification(s)\n(only shows aligned to selected TP)",
-            options=available_quals(df, tps) if tps else []
+            options=all_quals,
+            default=all_quals
         )
     else:
         quals = []  # ignore qualifications when aggregating
 
-    # Show instructions until selection
-    if not tps or (not aggregate and not quals):
+    # Show instructions until training package selection
+    if not tps:
         st.write(
             """
             **Instructions**  
             1. Select a *Training Contract Status* from the sidebar.  
             2. Choose one or more *Training Packages*.  
             3. Optionally check **Aggregate qualifications by Training Package**.  
-            4. If **Aggregate** is unchecked, you can also select Qualifications.  
+            4. If **Aggregate** is unchecked, qualifications will all be shown by default (or you can refine further).
             """
         )
         st.info(
-            "👉 Please select at least one *Training Package*, and if not aggregating, at least one *Qualification*."
+            "👉 Please select at least one *Training Package* to continue."
         )
         return
 
@@ -86,19 +88,15 @@ def run_app():
 
     ### Aggregated view by Training Package ###
     if aggregate:
-        # Group and sum numeric columns by Training Packages
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
-        # Plot: periods as x-axis, packages as lines
         df_plot = agg_df.set_index("Training Packages")[numeric_cols].T
         df_plot.index = [shorten_label(c) for c in df_plot.index]
         st.line_chart(df_plot)
 
-        # Show aggregated table
         st.subheader("Aggregated Data Table")
         table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
         st.dataframe(table_display)
 
-        # Download aggregated data
         towrite = io.BytesIO()
         with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
             table_display.to_excel(writer, index=False, sheet_name="Data")
@@ -113,12 +111,10 @@ def run_app():
         return
 
     ### Detailed view by Qualification ###
-    # Plot qualifications over time
     df_plot = sub.set_index("Latest Qualification")[numeric_cols].T
     df_plot.index = [shorten_label(c) for c in df_plot.index]
     st.line_chart(df_plot)
 
-    # Prepare detailed table with totals row
     subtable = sub.copy()
     totals = subtable[numeric_cols].sum()
     totals_dict = {col: totals[col] for col in numeric_cols}
@@ -129,7 +125,6 @@ def run_app():
     st.subheader("Data Table")
     st.dataframe(table_display)
 
-    # Download detailed data
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
         table.to_excel(writer, index=False, sheet_name="Data")
