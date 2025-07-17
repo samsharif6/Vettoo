@@ -69,20 +69,36 @@ def run_app():
         key="year_range"
     )
 
-    # Show instructions until at least one filter selected
+    # If only status is selected (no TP and no quals), show overall aggregation
     if not tps and not quals:
+        # Filter numeric cols by year range
+        numeric_cols = [
+            c for c in df.columns
+            if pd.api.types.is_numeric_dtype(df[c])
+            and start_year <= int(c.split('_')[-1]) <= end_year
+        ]
+        latest_period = numeric_cols[-1] if numeric_cols else ""
+
+        st.header(f"{status} — 12-month Data")
         st.write(
-            """
-            **Instructions**  
-            1. Select a *Training Contract Status* from the sidebar.  
-            2. Choose one or more *Training Packages* and/or *Qualifications*.  
-            3. Optionally check **Aggregate qualifications by Training Package**.  
-            4. Set the **Year Range** slider to filter the data.
-            """
+            f"NCVER, Apprentices and trainees – {shorten_label(latest_period)} DataBuilder, {status} by 12 month series – South Australia"
         )
-        st.info(
-            "👉 Please select at least one *Training Package* or *Qualification* to continue."
-        )
+        # Prepare total series
+        totals = df[numeric_cols].sum()
+        # Plot single total line
+        df_plot = pd.DataFrame({status: totals}).T  # one row, columns=periods
+        df_plot = df_plot.T
+        df_plot.index = [shorten_label(c) for c in df_plot.index]
+        st.line_chart(df_plot)
+
+        # Show total table
+        total_row = {"Latest Qualification": f"Total {status}"}
+        total_row.update({c: totals[c] for c in numeric_cols})
+        table_display = pd.DataFrame([total_row])
+        # rename period cols
+        table_display = table_display.rename(columns={c: shorten_label(c) for c in numeric_cols})
+        st.subheader("Aggregated Data Table")
+        st.dataframe(table_display)
         return
 
     # Default qualifications logic
