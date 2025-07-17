@@ -38,7 +38,7 @@ def run_app():
         key="tps"
     )
 
-                    # Qualifications selector (always available; filters by TP if chosen)
+    # Qualifications selector (always available; filters by TP if chosen)
     if tps:
         qual_options = available_quals(df, tps)
     else:
@@ -48,7 +48,6 @@ def run_app():
         options=qual_options,
         default=[],
         key="quals"
-    )
     )
 
     # Aggregate toggle
@@ -61,7 +60,6 @@ def run_app():
         )
 
     # Date period slider
-    # Identify all period columns
     all_periods = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
     sorted_periods = sorted(all_periods)
     start, end = st.sidebar.select_slider(
@@ -99,7 +97,7 @@ def run_app():
         sub = filter_by_qual(sub, quals)
 
     # Subset periods
-    numeric_cols = [c for c in period_range]
+    numeric_cols = period_range
     latest = numeric_cols[-1] if numeric_cols else ""
 
     # Header
@@ -142,17 +140,21 @@ def run_app():
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
         tbl.to_excel(writer, index=False, sheet_name="Data")
-        # metadata
         metadata = {
             "Source": f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia",
             "Period Range": f"{start} to {end}",
             "Training Packages": ", ".join(tps) if tps else "None",
             "Qualifications": ", ".join(quals) if quals else "None"
         }
-        md_df = pd.DataFrame(list(metadata.items(), columns=["Description","Value"])
+        md_df = pd.DataFrame(
+            list(metadata.items()),
+            columns=["Description", "Value"]
+        )
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
     fname = f"{status.lower().replace(' ','_')}_data_{start}_to_{end}.xlsx"
-    st.download_button("📥 Download data as Excel", data=towrite,
-                       file_name=fname,
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    st.download_button(
+        "📥 Download data as Excel", data=towrite,
+        file_name=fname,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
