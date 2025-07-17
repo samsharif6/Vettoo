@@ -38,17 +38,14 @@ def run_app():
         key="tps"
     )
 
-                # Qualifications selector (always available; filters by TP if chosen)
+                    # Qualifications selector (always available; filters by TP if chosen)
     if tps:
         qual_options = available_quals(df, tps)
     else:
         qual_options = sorted(df["Latest Qualification"].unique())
-    # Search-as-you-type filter
-    search = st.sidebar.text_input("Search qualifications")
-    if search:
-        qual_options = [q for q in qual_options if search.lower() in q.lower()]
     quals = st.sidebar.multiselect(
-        "Qualification(s)",
+        "Qualification(s)
+(start typing to filter)",
         options=qual_options,
         default=[],
         key="quals"
