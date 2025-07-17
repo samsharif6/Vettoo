@@ -22,12 +22,13 @@ def run_app():
     st.subheader("Click less. Know more.")
     st.subheader("Your data buddy in the VET world.")
 
-    # Reset button
+        # Reset button
     if st.sidebar.button("Reset selections"):
         for key in ["status", "tps", "aggregate", "quals"]:
             if key in st.session_state:
                 del st.session_state[key]
-        st.experimental_rerun()
+        # State cleared; restart the app flow
+        return
 
     # Sidebar: status selector
     dl = DataLoader()
