@@ -69,12 +69,14 @@ def run_app():
         key="year_range"
     )
 
-    # If only status is selected (no TP and no quals), show overall aggregation
+        # If only status is selected (no TP and no quals), read aggregated results from SA sheet
     if not tps and not quals:
-        # Filter numeric cols by year range
+        # Load SA aggregation sheet
+        sa_df = pd.read_excel(dl.file_path, sheet_name="SA")
+        # Extract numeric period columns within selected year range
         numeric_cols = [
-            c for c in df.columns
-            if pd.api.types.is_numeric_dtype(df[c])
+            c for c in sa_df.columns
+            if pd.api.types.is_numeric_dtype(sa_df[c])
             and start_year <= int(c.split('_')[-1]) <= end_year
         ]
         latest_period = numeric_cols[-1] if numeric_cols else ""
@@ -83,10 +85,15 @@ def run_app():
         st.write(
             f"NCVER, Apprentices and trainees – {shorten_label(latest_period)} DataBuilder, {status} by 12 month series – South Australia"
         )
-        # Prepare total series
-        totals = df[numeric_cols].sum()
+        # Filter row for selected status
+        row = sa_df.loc[sa_df['Training Contract Status'] == status, numeric_cols]
+        if row.empty:
+            st.warning(f"No aggregated data found for {status} in SA sheet.")
+            return
+        totals = row.squeeze()
+
         # Plot single total line
-        df_plot = pd.DataFrame({status: totals}).T  # one row, columns=periods
+        df_plot = pd.DataFrame({status: totals}).T
         df_plot = df_plot.T
         df_plot.index = [shorten_label(c) for c in df_plot.index]
         st.line_chart(df_plot)
@@ -95,7 +102,6 @@ def run_app():
         total_row = {"Latest Qualification": f"Total {status}"}
         total_row.update({c: totals[c] for c in numeric_cols})
         table_display = pd.DataFrame([total_row])
-        # rename period cols
         table_display = table_display.rename(columns={c: shorten_label(c) for c in numeric_cols})
         st.subheader("Aggregated Data Table")
         st.dataframe(table_display)
