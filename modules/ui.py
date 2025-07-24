@@ -49,12 +49,12 @@ def run_app():
 
     # Qualification selector
     if tps:
-        base_quals = available_quals(df, tps)
+        qual_options = available_quals(df, tps)
     else:
-        base_quals = sorted(df["Latest Qualification"].unique())
+        qual_options = sorted(df["Latest Qualification"].unique())
     quals = st.sidebar.multiselect(
         "Qualification(s)",
-        options=base_quals,
+        options=qual_options,
         default=[],
         disabled=aggregate,
         key="quals"
@@ -73,17 +73,15 @@ def run_app():
     else:
         start_year, end_year = None, None
 
-    # If only status selected: load SA sheet
+    # Only status selected: SA sheet
     if not tps and not quals:
         sa_df = pd.read_excel(dl.file_path, sheet_name="SA")
-        if years_int:
-            numeric_cols = [
-                c for c in sa_df.columns
-                if pd.api.types.is_numeric_dtype(sa_df[c])
-                and start_year <= int(c.split('_')[-1]) <= end_year
-            ]
-        else:
-            numeric_cols = []
+        # find numeric cols in range
+        numeric_cols = [
+            c for c in sa_df.columns
+            if pd.api.types.is_numeric_dtype(sa_df[c])
+            and (start_year is None or (start_year <= int(c.split('_')[-1]) <= end_year))
+        ]
         latest = numeric_cols[-1] if numeric_cols else ""
 
         st.header(f"{status} — 12-month Data")
@@ -96,18 +94,21 @@ def run_app():
             return
         totals = row.squeeze()
 
-        # Plot single total line
-        df_plot = pd.DataFrame(totals.values, index=[shorten_label(c) for c in numeric_cols], columns=[status])
-        fig = px.line(df_plot, markers=True)
-        # remove axis titles
+        # Plot
+        plot_df = pd.DataFrame({status: totals.values},
+                                index=[shorten_label(c) for c in numeric_cols])
+        fig = px.line(plot_df, markers=True)
         fig.update_layout(xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
 
-        # Show total table
+        # Table
         table_display = pd.DataFrame([{
             "Latest Qualification": f"Total {status}",
             **{shorten_label(c): totals[c] for c in numeric_cols}
         }])
+        # Round to nearest 5
+        num_cols = [col for col in table_display.columns if col != "Latest Qualification"]
+        table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
         st.subheader("Aggregated Data Table")
         st.dataframe(table_display)
         return
@@ -119,76 +120,62 @@ def run_app():
     if not aggregate and quals:
         sub = filter_by_qual(sub, quals)
 
-    # Determine numeric columns in range
-    if years_int:
-        numeric_cols = [
-            c for c in sub.columns
-            if pd.api.types.is_numeric_dtype(sub[c])
-            and start_year <= int(c.split('_')[-1]) <= end_year
-        ]
-    else:
-        numeric_cols = []
+    # Determine numeric cols
+    numeric_cols = [
+        c for c in sub.columns
+        if pd.api.types.is_numeric_dtype(sub[c])
+        and (start_year is None or (start_year <= int(c.split('_')[-1]) <= end_year))
+    ]
     latest = numeric_cols[-1] if numeric_cols else ""
 
-    # Header and subtitle
+    # Header
     st.header(f"{status} — 12-month Data")
     st.write(
         f"NCVER, Apprentices and trainees – {shorten_label(latest)} DataBuilder, {status} by 12 month series – South Australia"
     )
 
-    # Plot
+    # Plot and table
     if aggregate and tps:
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
         df_long = agg_df.melt(id_vars="Training Packages", value_vars=numeric_cols,
                               var_name="Period", value_name="Value")
-        # shorten Period labels
         df_long["Period"] = df_long["Period"].apply(shorten_label)
-        fig = px.line(
-            df_long,
-            x="Period",
-            y="Value",
-            color="Training Packages",
-            markers=True,
-            title="Aggregated by Training Package"
-        )
-        fig.update_layout(
-            legend=dict(orientation="v", x=1.02, y=1),
-            margin=dict(r=200), xaxis_title=None, yaxis_title=None
-        )
+        fig = px.line(df_long, x="Period", y="Value", color="Training Packages",
+                      markers=True, title="Aggregated by Training Package")
+        fig.update_layout(legend=dict(orientation="v", x=1.02, y=1), margin=dict(r=200),
+                          xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
+
+        # Table
+        table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
+        num_cols = [col for col in table_display.columns if col != "Training Packages"]
+        table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
+        st.subheader("Aggregated Data Table")
+        st.dataframe(table_display)
+
     else:
         df_long = sub.melt(id_vars="Latest Qualification", value_vars=numeric_cols,
                            var_name="Period", value_name="Value")
         df_long["Period"] = df_long["Period"].apply(shorten_label)
-        fig = px.line(
-            df_long,
-            x="Period",
-            y="Value",
-            color="Latest Qualification",
-            markers=True,
-            title="Qualifications over Time"
-        )
-        fig.update_layout(
-            legend=dict(orientation="v", x=1.02, y=1),
-            margin=dict(r=200), xaxis_title=None, yaxis_title=None
-        )
+        fig = px.line(df_long, x="Period", y="Value", color="Latest Qualification",
+                      markers=True, title="Qualifications over Time")
+        fig.update_layout(legend=dict(orientation="v", x=1.02, y=1), margin=dict(r=200),
+                          xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
 
-    # Data table
-    st.subheader("Data Table")
-    if aggregate and tps:
-        table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
-    else:
+        # Table
         totals = sub[numeric_cols].sum()
-        table = pd.concat([sub, pd.DataFrame([{
-            "Latest Qualification": "Total of selected items",
-            **{c: totals[c] for c in numeric_cols}
-        }])], ignore_index=True)
+        table = pd.concat([sub, pd.DataFrame([{"Latest Qualification": "Total of selected items",
+                                               **{c: totals[c] for c in numeric_cols}}])],
+                          ignore_index=True)
         display_cols = ["Latest Qualification", "TDV", "Training Packages"] + numeric_cols
         table_display = table[display_cols].rename(columns={c: shorten_label(c) for c in numeric_cols})
-    st.dataframe(table_display)
+        num_cols = [col for col in table_display.columns if col not in ["Latest Qualification","TDV","Training Packages"]]
+        table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
+        st.subheader("Data Table")
+        st.dataframe(table_display)
 
-    # Download with metadata
+    # Download
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
         table_display.to_excel(writer, index=False, sheet_name="Data")
@@ -203,12 +190,9 @@ def run_app():
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
     fname = f"{status.lower().replace(' ', '_')}_data_{start_year}_to_{end_year}.xlsx"
-    st.download_button(
-        label="📥 Download data as Excel",
-        data=towrite,
-        file_name=fname,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    st.download_button(label="📥 Download data as Excel", data=towrite,
+                       file_name=fname,
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     # Footer disclaimer
     st.markdown(
