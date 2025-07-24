@@ -103,15 +103,14 @@ def run_app():
         fig.update_layout(xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
 
-                # Show total table, round to nearest 5
+        # Show total table, round to nearest 5
         table_display = pd.DataFrame([{
             "Latest Qualification": f"Total {status}",
             **{shorten_label(c): totals[c] for c in numeric_cols}
         }])
-        # Round numeric columns to nearest 5
         num_cols = [col for col in table_display.columns if col != "Latest Qualification"]
         table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
-        st.subheader("Aggregated Data Table")("Aggregated Data Table")
+        st.subheader("Aggregated Data Table")
         st.dataframe(table_display)
         return
 
@@ -154,11 +153,11 @@ def run_app():
         )
         st.plotly_chart(fig, use_container_width=True)
 
-                # Show aggregated table, round to nearest 5
+        # Show aggregated table, round to nearest 5
         table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
         num_cols = [col for col in table_display.columns if col != "Training Packages"]
         table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
-        st.subheader("Aggregated Data Table")("Aggregated Data Table")
+        st.subheader("Aggregated Data Table")
         st.dataframe(table_display)
 
     else:
@@ -177,20 +176,22 @@ def run_app():
         )
         st.plotly_chart(fig, use_container_width=True)
 
-                # Show detailed table, round to nearest 5
+        # Show detailed table, round to nearest 5
         totals = sub[numeric_cols].sum()
         table = pd.concat([
             sub,
-            pd.DataFrame([{  
+            pd.DataFrame([{
                 "Latest Qualification": "Total of selected items",
                 **{c: totals[c] for c in numeric_cols}
             }])
         ], ignore_index=True)
         display_cols = ["Latest Qualification", "TDV", "Training Packages"] + numeric_cols
         table_display = table[display_cols].rename(columns={c: shorten_label(c) for c in numeric_cols})
-        num_cols = [col for col in table_display.columns if col not in ["Latest Qualification","TDV","Training Packages"]]
+        num_cols = [col for col in table_display.columns if col not in [
+            "Latest Qualification", "TDV", "Training Packages"
+        ]]
         table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
-        st.subheader("Data Table")("Data Table")
+        st.subheader("Data Table")
         st.dataframe(table_display)
 
     # Download data with metadata
