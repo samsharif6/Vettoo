@@ -76,7 +76,7 @@ def run_app():
     # Only status selected: SA sheet
     if not tps and not quals:
         sa_df = pd.read_excel(dl.file_path, sheet_name="SA")
-        # find numeric cols in range
+        # Determine numeric cols within range
         numeric_cols = [
             c for c in sa_df.columns
             if pd.api.types.is_numeric_dtype(sa_df[c])
@@ -94,19 +94,20 @@ def run_app():
             return
         totals = row.squeeze()
 
-        # Plot
-        plot_df = pd.DataFrame({status: totals.values},
-                                index=[shorten_label(c) for c in numeric_cols])
+        # Plot total series
+        plot_df = pd.DataFrame(
+            {status: totals.values},
+            index=[shorten_label(c) for c in numeric_cols]
+        )
         fig = px.line(plot_df, markers=True)
         fig.update_layout(xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
 
-        # Table
+        # Show total table, round to nearest 5
         table_display = pd.DataFrame([{
             "Latest Qualification": f"Total {status}",
             **{shorten_label(c): totals[c] for c in numeric_cols}
         }])
-        # Round to nearest 5
         num_cols = [col for col in table_display.columns if col != "Latest Qualification"]
         table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
         st.subheader("Aggregated Data Table")
@@ -120,7 +121,7 @@ def run_app():
     if not aggregate and quals:
         sub = filter_by_qual(sub, quals)
 
-    # Determine numeric cols
+    # Determine numeric cols within range
     numeric_cols = [
         c for c in sub.columns
         if pd.api.types.is_numeric_dtype(sub[c])
@@ -137,16 +138,22 @@ def run_app():
     # Plot and table
     if aggregate and tps:
         agg_df = sub.groupby("Training Packages")[numeric_cols].sum().reset_index()
-        df_long = agg_df.melt(id_vars="Training Packages", value_vars=numeric_cols,
-                              var_name="Period", value_name="Value")
+        df_long = agg_df.melt(
+            id_vars="Training Packages", value_vars=numeric_cols,
+            var_name="Period", value_name="Value"
+        )
         df_long["Period"] = df_long["Period"].apply(shorten_label)
-        fig = px.line(df_long, x="Period", y="Value", color="Training Packages",
-                      markers=True, title="Aggregated by Training Package")
-        fig.update_layout(legend=dict(orientation="v", x=1.02, y=1), margin=dict(r=200),
-                          xaxis_title=None, yaxis_title=None)
+        fig = px.line(
+            df_long, x="Period", y="Value", color="Training Packages",
+            markers=True, title="Aggregated by Training Package"
+        )
+        fig.update_layout(
+            legend=dict(orientation="v", x=1.02, y=1),
+            margin=dict(r=200), xaxis_title=None, yaxis_title=None
+        )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Table
+        # Show aggregated table, round to nearest 5
         table_display = agg_df.rename(columns={c: shorten_label(c) for c in numeric_cols})
         num_cols = [col for col in table_display.columns if col != "Training Packages"]
         table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
@@ -154,28 +161,40 @@ def run_app():
         st.dataframe(table_display)
 
     else:
-        df_long = sub.melt(id_vars="Latest Qualification", value_vars=numeric_cols,
-                           var_name="Period", value_name="Value")
+        df_long = sub.melt(
+            id_vars="Latest Qualification", value_vars=numeric_cols,
+            var_name="Period", value_name="Value"
+        )
         df_long["Period"] = df_long["Period"].apply(shorten_label)
-        fig = px.line(df_long, x="Period", y="Value", color="Latest Qualification",
-                      markers=True, title="Qualifications over Time")
-        fig.update_layout(legend=dict(orientation="v", x=1.02, y=1), margin=dict(r=200),
-                          xaxis_title=None, yaxis_title=None)
+        fig = px.line(
+            df_long, x="Period", y="Value", color="Latest Qualification",
+            markers=True, title="Qualifications over Time"
+        )
+        fig.update_layout(
+            legend=dict(orientation="v", x=1.02, y=1),
+            margin=dict(r=200), xaxis_title=None, yaxis_title=None
+        )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Table
+        # Show detailed table, round to nearest 5
         totals = sub[numeric_cols].sum()
-        table = pd.concat([sub, pd.DataFrame([{"Latest Qualification": "Total of selected items",
-                                               **{c: totals[c] for c in numeric_cols}}])],
-                          ignore_index=True)
+        table = pd.concat([
+            sub,
+            pd.DataFrame([{
+                "Latest Qualification": "Total of selected items",
+                **{c: totals[c] for c in numeric_cols}
+            }])
+        ], ignore_index=True)
         display_cols = ["Latest Qualification", "TDV", "Training Packages"] + numeric_cols
         table_display = table[display_cols].rename(columns={c: shorten_label(c) for c in numeric_cols})
-        num_cols = [col for col in table_display.columns if col not in ["Latest Qualification","TDV","Training Packages"]]
+        num_cols = [col for col in table_display.columns if col not in [
+            "Latest Qualification", "TDV", "Training Packages"
+        ]]
         table_display[num_cols] = (table_display[num_cols] / 5).round() * 5
         st.subheader("Data Table")
         st.dataframe(table_display)
 
-    # Download
+    # Download data with metadata
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine="openpyxl") as writer:
         table_display.to_excel(writer, index=False, sheet_name="Data")
@@ -190,9 +209,12 @@ def run_app():
         md_df.to_excel(writer, index=False, sheet_name="Metadata")
     towrite.seek(0)
     fname = f"{status.lower().replace(' ', '_')}_data_{start_year}_to_{end_year}.xlsx"
-    st.download_button(label="📥 Download data as Excel", data=towrite,
-                       file_name=fname,
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    st.download_button(
+        label="📥 Download data as Excel",
+        data=towrite,
+        file_name=fname,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     # Footer disclaimer
     st.markdown(
