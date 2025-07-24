@@ -225,6 +225,7 @@ def run_app():
 
 
 
+
     # Footer disclaimer
     st.markdown(
         """
@@ -233,9 +234,9 @@ def run_app():
         The views and interpretations expressed are those of the author and do not necessarily reflect the views of NCVER.<br><br>
         © NCVER and the Commonwealth of Australia. All rights reserved. Some images, logos, and visual design elements may be subject to separate copyright.<br><br>
         Numbers are rounded to the nearest 5.<br>
+        Zero (0) indicates an actual value of zero, while a dash (–) represents a non-zero number rounded to zero.<br>
         For important matters, cross-check the data with NCVER DataBuilder.
         </div>
         """,
         unsafe_allow_html=True
     )
-
